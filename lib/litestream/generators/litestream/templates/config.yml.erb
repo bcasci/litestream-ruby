@@ -12,10 +12,10 @@
 dbs:
   <%- production_sqlite_databases.each do |database| -%>
   - path: <%= database %>
-    replicas:
-      - type: s3
-        bucket: $LITESTREAM_REPLICA_BUCKET
-        path: <%= database %>
-        access-key-id: $LITESTREAM_ACCESS_KEY_ID
-        secret-access-key: $LITESTREAM_SECRET_ACCESS_KEY
+    replica:
+      type: s3
+      bucket: $LITESTREAM_REPLICA_BUCKET
+      path: <%= database %>
+      access-key-id: $LITESTREAM_ACCESS_KEY_ID
+      secret-access-key: $LITESTREAM_SECRET_ACCESS_KEY
   <%- end -%>

@@ -20,6 +20,9 @@ module Litestream
     # raised when a litestream command fails
     CommandFailedException = Class.new(StandardError)
 
+    # raised when a command is not supported in the current Litestream version
+    CommandNotSupportedException = Class.new(StandardError)
+
     module Output
       class << self
         def format(data)
@@ -120,16 +123,18 @@ module Litestream
         execute("generations", argv, database)
       end
 
-      def snapshots(database, **argv)
-        raise DatabaseRequiredException, "database argument is required for snapshots command, e.g. litestream:snapshots -- --database=path/to/database.sqlite" if database.nil?
+      def snapshots(_database = nil, **_argv)
+        raise CommandNotSupportedException, "The `snapshots` command was removed in Litestream v0.5. Use `ltx` instead to list LTX files."
+      end
 
-        execute("snapshots", argv, database)
+      def ltx(database, **argv)
+        raise DatabaseRequiredException, "database argument is required for ltx command, e.g. litestream:ltx -- --database=path/to/database.sqlite" if database.nil?
+
+        execute("ltx", argv, database)
       end
 
       def wal(database, **argv)
-        raise DatabaseRequiredException, "database argument is required for wal command, e.g. litestream:wal -- --database=path/to/database.sqlite" if database.nil?
-
-        execute("wal", argv, database)
+        ltx(database, **argv)
       end
 
       private
