@@ -11,10 +11,7 @@ class Litestream::TestProcessesController < ActionDispatch::IntegrationTest
           "name" => "s3",
           "lag" => "23h59m59s",
           "start" => "2024-05-02T11:32:16Z",
-          "end" => "2024-05-02T11:33:10Z",
-          "snapshots" => [
-            {"index" => "0", "size" => "4145735", "created" => "2024-05-02T11:32:16Z"}
-          ]}
+          "end" => "2024-05-02T11:33:10Z"}
        ]}
     ]
     Litestream.stub :replicate_process, stubbed_process do
