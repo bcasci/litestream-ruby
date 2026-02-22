@@ -9,4 +9,6 @@
 /exe/*/litestream
 test/dummy/log/test.log
 .DS_Store
+.claude-flow/
+CLAUDE.local.md
 /test/**/*.sqlite3
