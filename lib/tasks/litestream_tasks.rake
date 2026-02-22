@@ -40,6 +40,12 @@ namespace :litestream do
     puts Litestream::Commands::Output.format(Litestream::Commands.generations(database, **options))
   end
 
+  desc "Download the Litestream binary for the current platform (required when installing from a git source)"
+  task download: :environment do
+    exe_path = Litestream::Commands.download
+    puts "Downloaded Litestream binary to #{exe_path}"
+  end
+
   desc "List all LTX files for a database or replica, for example `rake litestream:ltx -- -database=storage/production.sqlite3`"
   task ltx: :environment do
     options = parse_argv_options

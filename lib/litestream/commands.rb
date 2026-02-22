@@ -46,6 +46,38 @@ module Litestream
         [:cpu, :os].map { |m| Gem::Platform.local.send(m) }.join("-")
       end
 
+      def download_url
+        filename = Litestream::Upstream::NATIVE_PLATFORMS[platform]
+        raise UnsupportedPlatformException, "litestream-ruby does not support the #{platform} platform" if filename.nil?
+
+        "https://github.com/benbjohnson/litestream/releases/download/#{Litestream::Upstream::VERSION}/#{filename}"
+      end
+
+      def download(exe_path: DEFAULT_DIR)
+        require "open-uri"
+        require "zlib"
+        require "rubygems/package"
+
+        url = download_url
+        platform_dir = File.join(exe_path, platform)
+        exe_file = File.join(platform_dir, "litestream")
+
+        FileUtils.mkdir_p(platform_dir)
+
+        URI.open(url) do |remote| # standard:disable Security/Open
+          Zlib::GzipReader.wrap(remote) do |gz|
+            Gem::Package::TarReader.new(gz) do |reader|
+              reader.seek("litestream") do |file|
+                File.binwrite(exe_file, file.read)
+              end
+            end
+          end
+        end
+
+        FileUtils.chmod(0o755, exe_file)
+        exe_file
+      end
+
       def executable(exe_path: DEFAULT_DIR)
         litestream_install_dir = ENV["LITESTREAM_INSTALL_DIR"]
         if litestream_install_dir
