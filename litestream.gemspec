@@ -20,6 +20,15 @@ Gem::Specification.new do |spec|
     "changelog_uri" => "https://github.com/fractaledmind/litestream-ruby/CHANGELOG.md"
   }
 
+  spec.post_install_message = <<~MESSAGE
+    If you installed litestream from a Git source (e.g., `github:`), you must
+    download the Litestream binary for your platform:
+
+        bin/rails litestream:download
+
+    This step is not needed when installing from RubyGems.
+  MESSAGE
+
   spec.files = Dir["{app,config,lib}/**/*", "LICENSE", "Rakefile", "README.md"]
   spec.bindir = "exe"
   spec.executables << "litestream"

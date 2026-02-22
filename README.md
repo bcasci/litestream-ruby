@@ -58,6 +58,16 @@ Supported platforms are:
 - arm64-linux (linux-arm64)
 - x86_64-linux (linux-x64)
 
+### Installing from a Git source
+
+If you are installing the gem from a Git source (e.g., a GitHub fork), the pre-compiled binary is not bundled. After `bundle install`, download the binary for your platform:
+
+```sh
+bin/rails litestream:download
+```
+
+This downloads the correct Litestream binary from GitHub releases and places it where the gem expects to find it. This step is not needed when installing from RubyGems.
+
 ### Using a local installation of `litestream`
 
 If you are not able to use the vendored standalone executables (for example, if you're on an unsupported platform), you can use a local installation of the `litestream` executable by setting an environment variable named `LITESTREAM_INSTALL_DIR` to the directory containing the executable.
