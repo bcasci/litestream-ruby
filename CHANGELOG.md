@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.15.0] - 2026-02-22
+
+- **BREAKING**: Upgrade bundled Litestream binary from v0.3.13 to v0.5.8
+- **BREAKING**: Remove `snapshots` command (`Litestream::Commands.snapshots` now raises `CommandNotSupportedException`)
+- **BREAKING**: Rename `wal` command to `ltx` (the `Litestream::Commands.wal` method still works as an alias)
+- **BREAKING**: Remove `litestream:snapshots` and `litestream:wal` rake tasks, add `litestream:ltx`
+- **BREAKING**: Config format changed from `replicas:` (array) to `replica:` (singular object)
+- Remove snapshots display from the dashboard view
+- Update binary naming: no `v` prefix, `x86_64` replaces `amd64`, `.tar.gz` for all platforms
+
 ## [0.14.0] - 2025-06-14
 
 - Change async behaviour of replicate and other commands ([@hschne](https://github.com/fractaledmind/litestream-ruby/pull/62))
