@@ -87,12 +87,12 @@ The default configuration file looks like this if you only have one SQLite datab
 ```yaml
 dbs:
   - path: storage/production.sqlite3
-    replicas:
-      - type: s3
-        path: storage/production.sqlite3
-        bucket: $LITESTREAM_REPLICA_BUCKET
-        access-key-id: $LITESTREAM_ACCESS_KEY_ID
-        secret-access-key: $LITESTREAM_SECRET_ACCESS_KEY
+    replica:
+      type: s3
+      path: storage/production.sqlite3
+      bucket: $LITESTREAM_REPLICA_BUCKET
+      access-key-id: $LITESTREAM_ACCESS_KEY_ID
+      secret-access-key: $LITESTREAM_SECRET_ACCESS_KEY
 ```
 
 This is the default for Amazon S3. The full range of possible replica types (e.g. other S3-compatible object storage servers) are covered in Litestream's [replica guides](https://litestream.io/guides/#replica-guides).
@@ -404,31 +404,21 @@ name  generation        lag     start                 end
 s3    a295b16a796689f3  -156ms  2024-04-17T00:01:19Z  2024-04-17T00:01:19Z
 ```
 
-You can list the snapshots available for a database:
+You can list the LTX files available for a database:
 
 ```shell
-bin/rails litestream:snapshots -- --database=storage/production.sqlite3
+bin/rails litestream:ltx -- --database=storage/production.sqlite3
 ```
 
-This command lists snapshots available for that specified database:
-
-```
-replica  generation        index  size     created
-s3       a295b16a796689f3  1      4645465  2024-04-17T00:01:19Z
-```
-
-Finally, you can list the wal files available for a database:
-
-```shell
-bin/rails litestream:wal -- --database=storage/production.sqlite3
-```
-
-This command lists wal files available for that specified database:
+This command lists LTX files available for that specified database:
 
 ```
 replica  generation        index  offset    size     created
 s3       a295b16a796689f3  1      0         2036     2024-04-17T00:01:19Z
 ```
+
+> [!NOTE]
+> The `snapshots` command was removed in Litestream v0.5. The `wal` command was renamed to `ltx`. The `Litestream::Commands.wal` Ruby method still works as a backward-compatible alias for `ltx`.
 
 ### Running commands from Ruby
 
@@ -448,19 +438,15 @@ Litestream::Commands.generations('storage/production.sqlite3')
 # => [{"name"=>"s3", "generation"=>"5f4341bc3d22d615", "lag"=>"3s", "start"=>"2024-04-17T19:48:09Z", "end"=>"2024-04-17T19:48:09Z"}]
 ```
 
-The `Litestream::Commands.snapshots` method returns an array of hashes with the "replica", "generation", "index", "size", and "created" keys for each snapshot:
+The `Litestream::Commands.ltx` method returns an array of hashes with the "replica", "generation", "index", "offset", "size", and "created" keys for each LTX file:
 
 ```ruby
-Litestream::Commands.snapshots('storage/production.sqlite3')
-# => [{"replica"=>"s3", "generation"=>"5f4341bc3d22d615", "index"=>"0", "size"=>"4645465", "created"=>"2024-04-17T19:48:09Z"}]
+Litestream::Commands.ltx('storage/production.sqlite3')
+# => [{"replica"=>"s3", "generation"=>"5f4341bc3d22d615", "index"=>"0", "offset"=>"0", "size"=>"2036", "created"=>"2024-04-17T19:48:09Z"}]
 ```
 
-The `Litestream::Commands.wal` method returns an array of hashes with the "replica", "generation", "index", "offset","size", and "created" keys for each wal:
-
-```ruby
-Litestream::Commands.wal('storage/production.sqlite3')
-# => [{"replica"=>"s3", "generation"=>"5f4341bc3d22d615", "index"=>"0",  "offset"=>"0", "size"=>"2036", "created"=>"2024-04-17T19:48:09Z"}]
-```
+> [!NOTE]
+> `Litestream::Commands.wal` still works as an alias for `ltx`. `Litestream::Commands.snapshots` raises `CommandNotSupportedException` as the command was removed in Litestream v0.5.
 
 You can also restore a database programmatically using the `Litestream::Commands.restore` method, which returns the path to the restored database:
 
@@ -480,11 +466,10 @@ The full set of commands available to the `litestream` executable are covered in
 ```shell
 litestream databases [arguments]
 litestream generations [arguments] DB_PATH|REPLICA_URL
+litestream ltx [arguments] DB_PATH|REPLICA_URL
 litestream replicate [arguments]
 litestream restore [arguments] DB_PATH|REPLICA_URL
-litestream snapshots [arguments] DB_PATH|REPLICA_URL
 litestream version
-litestream wal [arguments] DB_PATH|REPLICA_URL
 ```
 
 ### Using in development
@@ -518,7 +503,7 @@ end
 With Litestream properly configured and the MinIO server and Litestream replication process running, you should see something like the following in your terminal logs when you start the `bin/dev` process:
 
 ```sh
-time=YYYY-MM-DDTHH:MM:SS level=INFO msg=litestream version=v0.3.xx
+time=YYYY-MM-DDTHH:MM:SS level=INFO msg=litestream version=v0.5.xx
 time=YYYY-MM-DDTHH:MM:SS level=INFO msg="initialized db" path=/path/to/your/app/storage/development.sqlite3
 time=YYYY-MM-DDTHH:MM:SS level=INFO msg="replicating to" name=s3 type=s3 sync-interval=1s bucket=mybkt path="" region=us-east-1 endpoint=http://localhost:9000
 ```
