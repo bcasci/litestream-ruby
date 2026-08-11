@@ -12,3 +12,16 @@ test/dummy/log/test.log
 .claude-flow/
 CLAUDE.local.md
 /test/**/*.sqlite3
+
+# claude-flow / ruflo self-updating, signed, version-pinned artifacts.
+# Kept on disk (used by the settings.json hooks) but not tracked — ruflo
+# rewrites them to match the installed CLI on every run. Regenerated via
+# `ruflo init upgrade`. Removed entirely when claude-flow is pulled.
+.claude/helpers/hook-handler.cjs
+.claude/helpers/auto-memory-hook.mjs
+.claude/helpers/intelligence.cjs
+.claude/helpers/statusline.cjs
+.claude/helpers/.helpers-version
+.claude/helpers/helpers.manifest.json
+.claude/proven-config.json
+.claude/.proven-config-version
