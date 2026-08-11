@@ -1,5 +1,9 @@
 # Claude Code Configuration - litestream-ruby
 
+## Coding Standards — READ FIRST
+
+This gem's coding standards (structure, naming, error handling, testing, Ruby idioms, extensibility) live in [`docs/standards/`](docs/standards/README.md). Read the index and follow it for every code change, test, and review. Enforced by the `litestream-standards` skill and a `standardrb` `PostToolUse` gate.
+
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less
