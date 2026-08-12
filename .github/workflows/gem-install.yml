@@ -62,7 +62,9 @@ jobs:
           name: gem-x86_64-linux
           path: pkg
       - run: "gem install pkg/litestream-*.gem"
-      - run: "litestream version"
+      - run: |
+          expected="$(ruby -e "require 'litestream/upstream'; puts Litestream::Upstream::VERSION.delete_prefix('v')")"
+          litestream version | grep -qF "$expected"
 
   # linux-arm64-install:
   #   needs: ["package"]
@@ -100,4 +102,6 @@ jobs:
           name: gem-arm64-darwin
           path: pkg
       - run: "gem install pkg/litestream-*.gem"
-      - run: "litestream version"
+      - run: |
+          expected="$(ruby -e "require 'litestream/upstream'; puts Litestream::Upstream::VERSION.delete_prefix('v')")"
+          litestream version | grep -qF "$expected"
