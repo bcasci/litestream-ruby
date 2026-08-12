@@ -35,4 +35,23 @@ class Litestream::TestRestorationsController < ActionDispatch::IntegrationTest
     assert_redirected_to litestream.root_path
     assert_match "verify the database path and your Litestream configuration, then retry", flash[:alert]
   end
+
+  # End-to-end: a real restore that exits non-zero flows restore -> execute -> run,
+  # raises CommandFailedException, and the controller surfaces an alert (not a success notice).
+  test "create surfaces an alert (not a success notice) when the restore process exits non-zero" do
+    failed = Object.new
+    failed.define_singleton_method(:success?) { false }
+    capture3 = proc { |*cmd| ["", "restore failed: no such replica", failed] }
+
+    Litestream::Commands.stub :executable, "exe/test/litestream" do
+      Open3.stub :capture3, capture3 do
+        post litestream.restorations_url, params: {database: "[ROOT]/storage/test.sqlite3"}
+      end
+    end
+
+    assert_redirected_to litestream.root_path
+    assert_nil flash[:notice]
+    assert_match "restore failed: no such replica", flash[:alert]
+    assert_match "verify the database path and your Litestream configuration, then retry", flash[:alert]
+  end
 end
