@@ -1,4 +1,7 @@
+# frozen_string_literal: true
+
 require "test_helper"
+require "stringio"
 
 class TestCommands < ActiveSupport::TestCase
   def run
@@ -758,6 +761,35 @@ class TestCommands < ActiveSupport::TestCase
       replicas_pos = lines[0].index("replicas")
       assert_equal replicas_pos, lines[1].index("s3")
       assert_equal replicas_pos, lines[2].index("s3")
+    end
+  end
+
+  class TestRunExecution < TestCommands
+    def test_run_executes_command_array_and_parses_tabular_output
+      received = nil
+      fake_popen = proc do |cmd, &blk|
+        received = cmd
+        blk.call(StringIO.new("name  replicas\ndb    s3"))
+      end
+
+      result = nil
+      IO.stub :popen, fake_popen do
+        result = Litestream::Commands.send(:run, ["litestream", "databases"], tabled_output: true)
+      end
+
+      assert_equal ["litestream", "databases"], received
+      assert_equal [{"name" => "db", "replicas" => "s3"}], result
+    end
+
+    def test_run_returns_raw_chomped_output_when_not_tabular
+      fake_popen = proc { |cmd, &blk| blk.call(StringIO.new("raw restore output\n")) }
+
+      result = nil
+      IO.stub :popen, fake_popen do
+        result = Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+      end
+
+      assert_equal "raw restore output", result
     end
   end
 end

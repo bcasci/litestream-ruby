@@ -1,35 +1,14 @@
 # frozen_string_literal: true
 
 require "sqlite3"
+require "shellwords"
 
 module Litestream
   VerificationFailure = Class.new(StandardError)
 
   class << self
-    attr_writer :configuration
-
-    def configuration
-      @configuration ||= Configuration.new
-    end
-
     def deprecator
-      @deprecator ||= ActiveSupport::Deprecation.new("0.12.0", "Litestream")
-    end
-  end
-
-  def self.configure
-    deprecator.warn(
-      "Configuring Litestream via Litestream.configure is deprecated. Use Rails.application.configure { config.litestream.* = ... } instead.",
-      caller
-    )
-    self.configuration ||= Configuration.new
-    yield(configuration)
-  end
-
-  class Configuration
-    attr_accessor :replica_bucket, :replica_key_id, :replica_access_key
-
-    def initialize
+      @deprecator ||= ActiveSupport::Deprecation.new("0.16.0", "Litestream")
     end
   end
 
@@ -55,9 +34,9 @@ module Litestream
 
       true
     ensure
-      database.execute("DELETE FROM _litestream_verification WHERE uuid = ?", sentinel)
-      database.close
-      Dir.glob(backup_path + "*").each { |file| File.delete(file) }
+      database&.execute("DELETE FROM _litestream_verification WHERE uuid = ?", sentinel) if sentinel
+      database&.close
+      Dir.glob(backup_path + "*").each { |file| File.delete(file) } if backup_path
     end
 
     # use method instead of attr_accessor to ensure
@@ -75,7 +54,7 @@ module Litestream
     end
 
     def replica_bucket
-      @@replica_bucket || configuration.replica_bucket
+      @@replica_bucket
     end
 
     def replica_region
@@ -87,11 +66,11 @@ module Litestream
     end
 
     def replica_key_id
-      @@replica_key_id || configuration.replica_key_id
+      @@replica_key_id
     end
 
     def replica_access_key
-      @@replica_access_key || configuration.replica_access_key
+      @@replica_access_key
     end
 
     def systemctl_command
@@ -107,26 +86,39 @@ module Litestream
     end
 
     def databases
-      databases = Commands.databases
-
-      databases.each do |db|
+      Commands.databases.map do |db|
         generations = Commands.generations(db["path"])
         db["path"] = db["path"].gsub(Rails.root.to_s, "[ROOT]")
 
         db["generations"] = generations.map do |generation|
           generation.slice("generation", "name", "lag", "start", "end")
         end
+
+        db
       end
     end
 
     private
 
-    def systemctl_info
-      return if `which systemctl`.empty?
+    # Run a command as an argument array (no shell), returning [stdout, status].
+    # Using IO.popen with an array avoids interpolating into a shell string,
+    # so a user-set systemctl_command can never inject shell metacharacters.
+    # Returning the status keeps the exit-code checks off the global `$?`.
+    # A missing binary raises SystemCallError (no shell to swallow it); we
+    # rescue it to `["", nil]` so callers degrade gracefully as the shell form did.
+    def capture(*command)
+      output = IO.popen(command) { |io| io.read }
+      [output, $?]
+    rescue SystemCallError
+      ["", nil]
+    end
 
-      systemctl_output = `#{Litestream.systemctl_command}`
-      systemctl_exit_code = $?.exitstatus
-      return unless systemctl_exit_code.zero?
+    def systemctl_info
+      which_output, _ = capture("which", "systemctl")
+      return if which_output.empty?
+
+      systemctl_output, systemctl_status = capture(*Shellwords.split(Litestream.systemctl_command))
+      return unless systemctl_status&.exitstatus&.zero?
 
       # ["● litestream.service - Litestream",
       #  "     Loaded: loaded (/lib/systemd/system/litestream.service; enabled; vendor preset: enabled)",
@@ -159,17 +151,19 @@ module Litestream
     end
 
     def process_info
-      litestream_replicate_ps = `ps -ax | grep litestream | grep replicate`
-      exit_code = $?.exitstatus
-      return unless exit_code.zero?
+      litestream_replicate_ps, _ = capture("ps", "-ax")
 
       info = {}
       litestream_replicate_ps.chomp.split("\n").each do |line|
         next unless line.include?("litestream replicate")
 
         pid, * = line.split(" ")
+        ps_output, _ = capture("ps", "-o", "state,lstart", pid)
+        status_line = ps_output.chomp.split("\n").last
+        next unless status_line
+
         info[:pid] = pid
-        state, _, lstart = `ps -o "state,lstart" #{pid}`.chomp.split("\n").last.partition(/\s+/)
+        state, _, lstart = status_line.partition(/\s+/)
 
         info[:status] = case state[0]
         when "I" then "idle"
@@ -180,6 +174,7 @@ module Litestream
         when "Z" then "zombie"
         end
         info[:started] = DateTime.strptime(lstart.strip, "%a %b %d %H:%M:%S %Y")
+        break
       end
       info
     end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "upstream"
 
 module Litestream
@@ -199,7 +201,7 @@ module Litestream
       end
 
       def run(cmd, tabled_output:)
-        stdout = `#{cmd.join(" ")}`.chomp
+        stdout = IO.popen(cmd) { |io| io.read }.chomp
         return stdout unless tabled_output
 
         keys, *rows = stdout.split("\n").map { _1.split(/\s+/) }

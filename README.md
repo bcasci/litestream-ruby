@@ -503,10 +503,10 @@ To simplify local development, you can add this command to your `Procfile.dev` f
 Once you have a MinIO server running, you can create a bucket for Litestream to use. You can do this by visiting the MinIO console at [http://localhost:9001](http://localhost:9001) and logging in with the default credentials of `minioadmin` and `minioadmin`. Once logged in, you can create a bucket named `mybkt` by clicking the `+` button in the bottom right corner of the screen. You can then use the following configuration in your `config/initializers/litestream.rb` file:
 
 ```ruby
-Litestream.configure do |config|
-  config.replica_bucket = "s3://mybkt.localhost:9000/"
-  config.replica_key_id = "minioadmin"
-  config.replica_access_key = "minioadmin"
+Rails.application.configure do
+  config.litestream.replica_bucket = "s3://mybkt.localhost:9000/"
+  config.litestream.replica_key_id = "minioadmin"
+  config.litestream.replica_access_key = "minioadmin"
 end
 ```
 

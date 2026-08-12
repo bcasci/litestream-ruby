@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- **BREAKING**: Remove `Litestream.configure` (deprecated since before 0.12.0). Configure via `Rails.application.configure { |config| config.litestream.replica_bucket = ... }`, the `Litestream.replica_bucket=` writers, or the `LITESTREAM_*` environment variables instead.
+- Build shell-outs as argument arrays (no shell interpolation); a user-set `Litestream.systemctl_command` is no longer shell-interpreted
+- Nil-guard `Litestream.verify!` cleanup so a database open failure surfaces the original error
+- Rescue restore failures in the dashboard's restore action and surface a remediation message instead of a 500
+
 ## [0.15.0] - 2026-02-22
 
 - **BREAKING**: Upgrade bundled Litestream binary from v0.3.13 to v0.5.8
