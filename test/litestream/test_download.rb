@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "test_helper"
 require "fileutils"
 require "rubygems/package"
@@ -103,6 +105,28 @@ class TestDownload < ActiveSupport::TestCase
       gz.write(tar_io.string)
       gz.close
       gz_io.string
+    end
+  end
+end
+
+class TestDownloadUrlAllPlatforms < ActiveSupport::TestCase
+  EXPECTED_URLS = {
+    "aarch64-linux" => "https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-linux-arm64.tar.gz",
+    "arm64-darwin" => "https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-darwin-arm64.tar.gz",
+    "arm64-linux" => "https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-linux-arm64.tar.gz",
+    "x86_64-darwin" => "https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-darwin-x86_64.tar.gz",
+    "x86_64-linux" => "https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-linux-x86_64.tar.gz"
+  }
+
+  def test_version_is_pinned_to_v0_5_16
+    assert_equal "v0.5.16", Litestream::Upstream::VERSION
+  end
+
+  def test_download_url_uses_literal_v0_5_16_asset_for_each_platform
+    EXPECTED_URLS.each do |platform, expected_url|
+      Litestream::Commands.stub :platform, platform do
+        assert_equal expected_url, Litestream::Commands.download_url
+      end
     end
   end
 end
