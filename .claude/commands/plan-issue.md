@@ -14,7 +14,11 @@ Plan issue #$1. Do not write or change any code, and do not branch.
    - Approach + files
    - Out of scope / gated
    - Risks
-3. **Vet** — Use the `plan-reviewer` subagent to vet `openspec/changes/issue-$1/plan.md`. If its verdict is `NEEDS-REVISION`, fix every issue it raises and vet again. Stop after 2 revision rounds; move any still-unresolved concern into the plan's Risks section.
-4. **GATE** — Show the vetted plan and wait for my reply. On my approval: set `Status: approved`, then commit only that file (`git add openspec/changes/issue-$1/plan.md && git commit`).
+3. **Vet loop** — Repeat until the `plan-reviewer` subagent returns `VERDICT: READY`, or you have done 2 revise-and-re-vet cycles:
+   - Run the `plan-reviewer` subagent on `openspec/changes/issue-$1/plan.md`.
+   - `READY` → exit the loop.
+   - `NEEDS-REVISION` → fix every issue it raised, then re-run.
+   If still `NEEDS-REVISION` after 2 cycles, move each unresolved issue into the plan's Risks section and flag it for my judgment.
+4. **GATE** — Show the vetted plan (and its final verdict) and wait for my reply. On my approval: set `Status: approved`, then commit only that file (`git add openspec/changes/issue-$1/plan.md && git commit`).
 
 Local only. Do not run `/apply-plan` — I will.
