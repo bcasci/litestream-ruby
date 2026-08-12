@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 module Litestream
   module Upstream
-    VERSION = "v0.5.8"
+    VERSION = "v0.5.16"
 
     # rubygems platform name => upstream release filename
     NATIVE_PLATFORMS = {
