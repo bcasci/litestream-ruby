@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "test_helper"
 require "rake"
 
@@ -11,6 +13,7 @@ class TestLitestreamTasks < ActiveSupport::TestCase
     Rake::Task["litestream:databases"].reenable
     Rake::Task["litestream:generations"].reenable
     Rake::Task["litestream:ltx"].reenable
+    Rake::Task["litestream:prune_v0_3_generations"].reenable
   end
 
   def teardown
@@ -216,6 +219,27 @@ class TestLitestreamTasks < ActiveSupport::TestCase
       fake.expect :call, nil, [nil]
       Litestream::Commands.stub :ltx, fake do
         Rake.application.invoke_task "litestream:ltx"
+      end
+      fake.verify
+    end
+  end
+
+  class TestPruneV03GenerationsTask < TestLitestreamTasks
+    def test_prune_task_with_no_arguments_runs_without_dry_run
+      fake = Minitest::Mock.new
+      fake.expect :call, Litestream::Cleanup::Summary.new(removed: []), [], dry_run: false
+      Litestream::Cleanup.stub :clean!, fake do
+        Rake.application.invoke_task "litestream:prune_v0_3_generations"
+      end
+      fake.verify
+    end
+
+    def test_prune_task_with_dry_run_flag_runs_dry
+      ARGV.replace ["--", "-dry-run"]
+      fake = Minitest::Mock.new
+      fake.expect :call, Litestream::Cleanup::Summary.new(removed: []), [], dry_run: true
+      Litestream::Cleanup.stub :clean!, fake do
+        Rake.application.invoke_task "litestream:prune_v0_3_generations"
       end
       fake.verify
     end
