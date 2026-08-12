@@ -189,4 +189,5 @@ end
 require_relative "litestream/version"
 require_relative "litestream/upstream"
 require_relative "litestream/commands"
+require_relative "litestream/cleanup"
 require_relative "litestream/engine" if defined?(::Rails::Engine)

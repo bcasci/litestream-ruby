@@ -46,6 +46,24 @@ namespace :litestream do
     puts "Downloaded Litestream binary to #{exe_path}"
   end
 
+  desc "Delete orphaned Litestream v0.3 shadow-WAL (`generations/`) directories left after upgrading to v0.5, for example `rake litestream:prune_v0_3_generations -- -dry-run`"
+  task prune_v0_3_generations: :environment do
+    options = parse_argv_options
+    dry_run = options.key?(:"-dry-run") || options.key?(:"--dry-run")
+
+    summary = Litestream::Cleanup.clean!(dry_run: dry_run)
+
+    if summary.removed.empty?
+      puts "No orphaned Litestream v0.3 `generations/` directories found."
+    else
+      count = summary.removed.length
+      verb = dry_run ? "Would remove" : "Removed"
+      noun = (count == 1) ? "directory" : "directories"
+      puts "#{verb} #{count} orphaned Litestream v0.3 `generations/` #{noun}:"
+      summary.removed.each { |path| puts "  #{path}" }
+    end
+  end
+
   desc "List all LTX files for a database or replica, for example `rake litestream:ltx -- -database=storage/production.sqlite3`"
   task ltx: :environment do
     options = parse_argv_options
