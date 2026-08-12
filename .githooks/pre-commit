@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Block the commit unless standardrb and the full test suite pass.
+# Enable once per clone: git config core.hooksPath .githooks
+# Bypass a single commit deliberately with: git commit --no-verify
+set -e
+export ASDF_RUBY_VERSION=3.3.8
+
+echo "pre-commit: standardrb…"
+bundle exec standardrb
+
+echo "pre-commit: rake test…"
+bundle exec rake test
