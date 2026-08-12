@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "open3"
+
 require_relative "upstream"
 
 module Litestream
@@ -178,7 +180,7 @@ module Litestream
         results = run(cmd, tabled_output: tabled_output)
 
         if Array === results && results.one? && results[0]["level"] == "ERROR"
-          raise CommandFailedException, "Failed to execute `#{cmd.join(" ")}`; Reason: #{results[0]["error"]}"
+          raise CommandFailedException, command_failed_message(cmd, results[0]["error"])
         else
           results
         end
@@ -201,11 +203,30 @@ module Litestream
       end
 
       def run(cmd, tabled_output:)
-        stdout = IO.popen(cmd) { |io| io.read }.chomp
+        stdout, stderr, status = Open3.capture3(*cmd)
+        # Forward the child's stderr (restore progress, warnings) instead of
+        # swallowing it, matching the previous console-inherited behavior.
+        $stderr.write(stderr) unless stderr.empty?
+
+        # Raise only for non-tabular commands (e.g. restore): a failed restore
+        # must not report success. Tabular introspection commands keep their
+        # prior behavior — exit status is ignored and execute's ERROR-row check
+        # is the failure path — so a transient error doesn't 500 the dashboard.
+        unless tabled_output || status.success?
+          reason = stderr.strip.empty? ? stdout.strip : stderr.strip
+          reason = status.to_s if reason.empty?
+          raise CommandFailedException, command_failed_message(cmd, reason)
+        end
+
+        stdout = stdout.chomp
         return stdout unless tabled_output
 
         keys, *rows = stdout.split("\n").map { _1.split(/\s+/) }
         rows.map { keys.zip(_1).to_h }
+      end
+
+      def command_failed_message(cmd, reason)
+        "Failed to execute `#{cmd.join(" ")}`; Reason: #{reason}"
       end
 
       def run_replicate(cmd, async:)

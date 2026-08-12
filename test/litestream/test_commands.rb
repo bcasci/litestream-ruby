@@ -765,15 +765,24 @@ class TestCommands < ActiveSupport::TestCase
   end
 
   class TestRunExecution < TestCommands
+    # A stand-in for Process::Status answering #success? / #to_s. Must NOT be
+    # named `run`, which TestCommands overrides as Minitest's per-test wrapper.
+    def status(success, description = "exit 1")
+      object = Object.new
+      object.define_singleton_method(:success?) { success }
+      object.define_singleton_method(:to_s) { description }
+      object
+    end
+
     def test_run_executes_command_array_and_parses_tabular_output
       received = nil
-      fake_popen = proc do |cmd, &blk|
+      fake = proc do |*cmd|
         received = cmd
-        blk.call(StringIO.new("name  replicas\ndb    s3"))
+        ["name  replicas\ndb    s3", "", status(true)]
       end
 
       result = nil
-      IO.stub :popen, fake_popen do
+      Open3.stub :capture3, fake do
         result = Litestream::Commands.send(:run, ["litestream", "databases"], tabled_output: true)
       end
 
@@ -782,14 +791,119 @@ class TestCommands < ActiveSupport::TestCase
     end
 
     def test_run_returns_raw_chomped_output_when_not_tabular
-      fake_popen = proc { |cmd, &blk| blk.call(StringIO.new("raw restore output\n")) }
+      fake = proc { |*cmd| ["raw restore output\n", "", status(true)] }
 
       result = nil
-      IO.stub :popen, fake_popen do
+      Open3.stub :capture3, fake do
         result = Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
       end
 
       assert_equal "raw restore output", result
+    end
+
+    def test_run_raises_on_non_zero_exit_for_non_tabular_command
+      fake = proc { |*cmd| ["", "restore failed: no such database", status(false)] }
+
+      error = assert_raises(Litestream::Commands::CommandFailedException) do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+        end
+      end
+
+      assert_includes error.message, "restore failed: no such database"
+      assert_includes error.message, "litestream restore"
+    end
+
+    def test_run_does_not_raise_on_non_zero_exit_for_tabular_command
+      # Tabular introspection commands keep their prior behavior so a transient
+      # error does not 500 the dashboard; execute's ERROR-row check is their path.
+      fake = proc { |*cmd| ["name  replicas\ndb    s3", "", status(false)] }
+
+      result = nil
+      Open3.stub :capture3, fake do
+        result = Litestream::Commands.send(:run, ["litestream", "databases"], tabled_output: true)
+      end
+
+      assert_equal [{"name" => "db", "replicas" => "s3"}], result
+    end
+
+    def test_run_forwards_stderr_on_success
+      fake = proc { |*cmd| ["ok", "restore progress line\n", status(true)] }
+
+      _out, err = capture_io do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+        end
+      end
+
+      assert_includes err, "restore progress line"
+    end
+
+    def test_run_failure_reason_uses_status_when_output_blank
+      # e.g. process killed by a signal: no stdout/stderr to explain it.
+      fake = proc { |*cmd| ["", "", status(false, "pid 123 SIGKILL (signal 9)")] }
+
+      error = assert_raises(Litestream::Commands::CommandFailedException) do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+        end
+      end
+
+      assert_includes error.message, "SIGKILL"
+    end
+
+    def test_run_failure_reason_falls_back_to_stdout_when_stderr_blank
+      fake = proc { |*cmd| ["boom on stdout", "", status(false)] }
+
+      error = assert_raises(Litestream::Commands::CommandFailedException) do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+        end
+      end
+
+      assert_includes error.message, "boom on stdout"
+    end
+
+    def test_run_failure_reason_prefers_stderr_when_both_present
+      fake = proc { |*cmd| ["stdout text", "stderr text", status(false)] }
+
+      error = assert_raises(Litestream::Commands::CommandFailedException) do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+        end
+      end
+
+      assert_includes error.message, "stderr text"
+      refute_includes error.message, "stdout text"
+    end
+
+    def test_run_propagates_errno_when_executable_missing
+      fake = proc { |*cmd| raise Errno::ENOENT, "litestream" }
+
+      assert_raises(Errno::ENOENT) do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.send(:run, ["litestream", "restore"], tabled_output: false)
+        end
+      end
+    end
+
+    def test_restore_raises_command_failed_exception_on_non_zero_exit
+      fake = proc { |*cmd| ["", "restore failed", status(false)] }
+
+      assert_raises(Litestream::Commands::CommandFailedException) do
+        Open3.stub :capture3, fake do
+          Litestream::Commands.restore("db/test.sqlite3")
+        end
+      end
+    end
+
+    def test_execute_still_raises_on_tabular_error_row_with_zero_exit
+      Litestream::Commands.stub :run, [{"level" => "ERROR", "error" => "boom"}] do
+        error = assert_raises(Litestream::Commands::CommandFailedException) do
+          Litestream::Commands.send(:execute, "databases")
+        end
+        assert_includes error.message, "boom"
+      end
     end
   end
 end
