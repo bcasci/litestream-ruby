@@ -1,6 +1,10 @@
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-11
+
 - **BREAKING**: Remove `Litestream.configure` (deprecated since before 0.12.0). Configure via `Rails.application.configure { |config| config.litestream.replica_bucket = ... }`, the `Litestream.replica_bucket=` writers, or the `LITESTREAM_*` environment variables instead.
+- Add `litestream:prune_v0_3_generations` rake task to remove orphaned v0.3 shadow-WAL (`generations/`) directories left behind after upgrading to Litestream v0.5 ([#6](https://github.com/fractaledmind/litestream-ruby/issues/6))
+- Detect restore failures: `Litestream::Commands.run` now raises `CommandFailedException` on a non-zero exit for non-tabular commands, so a failed `restore` no longer reports success ([#12](https://github.com/fractaledmind/litestream-ruby/issues/12))
 - Build shell-outs as argument arrays (no shell interpolation); a user-set `Litestream.systemctl_command` is no longer shell-interpreted
 - Nil-guard `Litestream.verify!` cleanup so a database open failure surfaces the original error
 - Rescue restore failures in the dashboard's restore action and surface a remediation message instead of a 500
