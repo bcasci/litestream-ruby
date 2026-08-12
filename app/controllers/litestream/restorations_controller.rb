@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Litestream
   class RestorationsController < ApplicationController
     # POST /restorations
@@ -12,6 +14,12 @@ module Litestream
       Litestream::Commands.restore(database, **{"-o" => backup})
 
       redirect_to root_path, notice: "Restored to <code>#{backup}</code>."
+    rescue Litestream::Commands::DatabaseRequiredException,
+      Litestream::Commands::CommandFailedException,
+      Litestream::Commands::ExecutableNotFoundException,
+      Litestream::Commands::UnsupportedPlatformException,
+      SystemCallError => e
+      redirect_to root_path, alert: "Restore failed: #{e.message} — verify the database path and your Litestream configuration, then retry."
     end
   end
 end
