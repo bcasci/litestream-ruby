@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-15
+
 - Fix the Puma plugin never stopping Litestream, so Litestream processes accumulated one per Puma restart, contended for SQLite's checkpointer lock, and let the WAL grow without bound ([#14](https://github.com/bcasci/litestream-ruby/issues/14)). Two defects:
   - `Litestream::Commands.replicate(async: true)` forked twice, so the pid the plugin recorded belonged to an intermediate process that exited immediately, and the real Litestream process was orphaned and untracked. It now uses `Process.spawn` and returns the pid of the process running the binary.
   - The plugin registered its liveness monitor from inside `on_booted`, but Puma runs `Plugins.fire_background` before it fires the booted event, so the monitor never started. It is now registered in the plugin's `start`.
