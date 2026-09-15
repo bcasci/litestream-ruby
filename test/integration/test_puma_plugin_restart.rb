@@ -49,6 +49,14 @@ class TestPumaPluginRestart < ActiveSupport::TestCase
     assert_equal [surviving], replication_pids
   end
 
+  # Puma 7 renamed the lifecycle events and warns on every boot for the old
+  # names. The plugin registers under whichever names the events object has.
+  def test_it_logs_no_puma_deprecation_warning
+    wait_for(BOOT_TIMEOUT, "Litestream to start") { replication_pids.first }
+
+    refute_includes read_puma_log, "is deprecated"
+  end
+
   private
 
   # A stand-in for the litestream binary: it `exec`s a process that sleeps until

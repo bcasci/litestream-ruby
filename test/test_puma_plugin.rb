@@ -5,7 +5,25 @@ require "puma/plugin"
 require "puma/plugin/litestream"
 
 class TestPumaPlugin < ActiveSupport::TestCase
-  class FakeEvents
+  # Puma 7 renamed the lifecycle events. These two fakes carry one naming scheme
+  # each, so a test can prove which names the plugin reaches for.
+  class ModernEvents
+    attr_reader :booted, :stopped, :restarted
+
+    def after_booted(&block)
+      @booted = block
+    end
+
+    def after_stopped(&block)
+      @stopped = block
+    end
+
+    def before_restart(&block)
+      @restarted = block
+    end
+  end
+
+  class LegacyEvents
     attr_reader :booted, :stopped, :restarted
 
     def on_booted(&block)
@@ -36,8 +54,8 @@ class TestPumaPlugin < ActiveSupport::TestCase
   class FakeLauncher
     attr_reader :events, :log_writer
 
-    def initialize
-      @events = FakeEvents.new
+    def initialize(events_class = ModernEvents)
+      @events = events_class.new
       @log_writer = FakeLogWriter.new
     end
   end
@@ -50,6 +68,13 @@ class TestPumaPlugin < ActiveSupport::TestCase
     @background_blocks = []
     captured = @background_blocks
     @plugin.define_singleton_method(:in_background) { |&block| captured << block }
+  end
+
+  # Restarts the plugin against an events object using the other naming scheme.
+  def start_with(events_class)
+    @launcher = FakeLauncher.new(events_class)
+    @plugin.start(@launcher)
+    @launcher.events
   end
 
   # The monitor loop sleeps between passes; tests drive it one pass at a time.
@@ -163,6 +188,60 @@ class TestPumaPlugin < ActiveSupport::TestCase
       end
 
       assert_equal [0, :INT], signals
+    end
+  end
+
+  class TestEventRegistration < TestPumaPlugin
+    def test_uses_the_names_puma_7_introduced_when_they_exist
+      events = start_with(ModernEvents)
+
+      refute_nil events.booted
+      refute_nil events.stopped
+      refute_nil events.restarted
+    end
+
+    def test_falls_back_to_the_names_puma_6_has
+      events = start_with(LegacyEvents)
+
+      refute_nil events.booted
+      refute_nil events.stopped
+      refute_nil events.restarted
+    end
+
+    def test_the_fallback_registers_working_blocks
+      events = start_with(LegacyEvents)
+      signals = []
+
+      Litestream::Commands.stub :replicate, 4242 do
+        events.booted.call
+      end
+
+      assert_equal 4242, @plugin.litestream_pid
+
+      Process.stub :kill, ->(signal, _pid) { signals << signal } do
+        Process.stub :waitpid, nil do
+          events.restarted.call
+        end
+      end
+
+      assert_equal [0, :INT], signals
+    end
+
+    # Guards against a Puma version check being reintroduced: each event is
+    # chosen on its own, so a mixed events object still registers all three.
+    def test_chooses_each_name_independently
+      mixed = Class.new(LegacyEvents) do
+        def after_booted(&block)
+          @booted_under_new_name = block
+        end
+
+        attr_reader :booted_under_new_name
+      end
+      events = start_with(mixed)
+
+      refute_nil events.booted_under_new_name
+      assert_nil events.booted
+      refute_nil events.restarted
     end
   end
 

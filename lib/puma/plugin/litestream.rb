@@ -16,16 +16,24 @@ Puma::Plugin.create do
       monitor_litestream
     end
 
-    launcher.events.on_booted do
+    register_event(launcher.events, :after_booted, :on_booted) do
       @stopping = false
       @litestream_pid = Litestream::Commands.replicate(async: true)
     end
 
-    launcher.events.on_stopped { stop_litestream }
-    launcher.events.on_restart { stop_litestream }
+    register_event(launcher.events, :after_stopped, :on_stopped) { stop_litestream }
+    register_event(launcher.events, :before_restart, :on_restart) { stop_litestream }
   end
 
   private
+
+  # Puma 7 renamed the lifecycle events and kept the old names as deprecated
+  # aliases that warn on every boot. Puma 6, which this gem still supports, has
+  # only the old names, so ask the events object rather than checking a version.
+  def register_event(events, name, legacy_name, &block)
+    name = legacy_name unless events.respond_to?(name)
+    events.public_send(name, &block)
+  end
 
   # Signals the Litestream process and then reaps it. The liveness check and the
   # signal come before the reap: reaping first leaves a pid that the kernel may
