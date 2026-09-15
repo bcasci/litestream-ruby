@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.17.1] - 2026-09-15
+
 - Register the Puma plugin's lifecycle hooks under whichever names the Puma in use has ([#16](https://github.com/bcasci/litestream-ruby/issues/16)). Puma 7 renamed `on_booted`, `on_restart` and `on_stopped` to `after_booted`, `before_restart` and `after_stopped`, keeping the old names as deprecated aliases that warn on every boot. The plugin asks the events object rather than checking a Puma version, so it keeps working on Puma 6, which has only the old names, and stops warning on Puma 7 and 8.
 
 ## [0.17.0] - 2026-09-15
