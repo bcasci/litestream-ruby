@@ -42,6 +42,7 @@ Gem::Specification.new do |spec|
     spec.add_dependency "activesupport", rails_version
     spec.add_dependency "railties", rails_version
   end
+  spec.add_development_dependency "puma"
   spec.add_development_dependency "rails"
   spec.add_development_dependency "rubyzip"
 
