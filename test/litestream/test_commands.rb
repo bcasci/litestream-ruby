@@ -6,10 +6,8 @@ require "stringio"
 class TestCommands < ActiveSupport::TestCase
   def run
     result = nil
-    Litestream::Commands.stub :fork, nil do
-      Litestream::Commands.stub :executable, "exe/test/litestream" do
-        capture_io { result = super }
-      end
+    Litestream::Commands.stub :executable, "exe/test/litestream" do
+      capture_io { result = super }
     end
     result
   end
@@ -163,6 +161,55 @@ class TestCommands < ActiveSupport::TestCase
       assert_equal "original_bkt", ENV["LITESTREAM_REPLICA_BUCKET"]
       assert_equal "original_key", ENV["LITESTREAM_ACCESS_KEY_ID"]
       assert_equal "original_access", ENV["LITESTREAM_SECRET_ACCESS_KEY"]
+    end
+  end
+
+  class TestRunReplicate < TestCommands
+    # The Puma plugin signals this pid to stop replication, so it has to be the
+    # pid of the process running the binary, not of an intermediate process.
+    def test_async_returns_the_pid_of_the_spawned_process
+      pid = nil
+
+      Process.stub :spawn, 4242 do
+        IO.stub :popen, ->(*) { flunk "async replication must not run in-process" } do
+          pid = Litestream::Commands.replicate(async: true)
+        end
+      end
+
+      assert_equal 4242, pid
+    end
+
+    def test_async_passes_the_command_as_an_argument_array
+      spawned = nil
+
+      Process.stub :spawn, ->(*cmd) { spawned = cmd } do
+        Litestream::Commands.replicate(async: true)
+      end
+
+      assert_match Regexp.new("exe/test/litestream"), spawned[0]
+      assert_equal "replicate", spawned[1]
+      assert_equal "--config", spawned[2]
+      assert_match Regexp.new("dummy/config/litestream.yml"), spawned[3]
+    end
+
+    def test_async_raises_when_the_executable_is_missing
+      Process.stub :spawn, ->(*) { raise Errno::ENOENT } do
+        assert_raises(Litestream::Commands::CommandFailedException) do
+          Litestream::Commands.replicate(async: true)
+        end
+      end
+    end
+
+    def test_in_process_replication_runs_in_process_and_returns_nil
+      result = :unset
+
+      Process.stub :spawn, ->(*) { flunk "in-process replication must not spawn" } do
+        IO.stub :popen, nil, StringIO.new("replicating\n") do
+          result = Litestream::Commands.replicate
+        end
+      end
+
+      assert_nil result
     end
   end
 

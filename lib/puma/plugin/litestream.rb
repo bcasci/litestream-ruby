@@ -2,21 +2,23 @@ require "puma/plugin"
 
 # Copied from https://github.com/rails/solid_queue/blob/15408647f1780033dad223d3198761ea2e1e983e/lib/puma/plugin/solid_queue.rb
 Puma::Plugin.create do
-  attr_reader :puma_pid, :litestream_pid, :log_writer
+  attr_reader :litestream_pid, :log_writer
 
   def start(launcher)
     @log_writer = launcher.log_writer
-    @puma_pid = $$
+    @stopping = false
+
+    # Registered here rather than inside `on_booted`: Puma runs
+    # `Puma::Plugins.fire_background` before it fires the booted event, and
+    # `in_background` only appends to the array that `fire_background` has
+    # already iterated. A block registered from inside `on_booted` never runs.
+    in_background do
+      monitor_litestream
+    end
 
     launcher.events.on_booted do
-      @litestream_pid = fork do
-        Thread.new { monitor_puma }
-        Litestream::Commands.replicate(async: true)
-      end
-
-      in_background do
-        monitor_litestream
-      end
+      @stopping = false
+      @litestream_pid = Litestream::Commands.replicate(async: true)
     end
 
     launcher.events.on_stopped { stop_litestream }
@@ -25,42 +27,60 @@ Puma::Plugin.create do
 
   private
 
+  # Signals the Litestream process and then reaps it. The liveness check and the
+  # signal come before the reap: reaping first leaves a pid that the kernel may
+  # already have recycled, and signalling that pid would hit another process.
   def stop_litestream
-    Process.waitpid(litestream_pid, Process::WNOHANG)
-    log_writer.log "Stopping Litestream..."
-    Process.kill(:INT, litestream_pid) if litestream_pid
-    Process.wait(litestream_pid)
-  rescue Errno::ECHILD, Errno::ESRCH
-  end
+    @stopping = true
+    return unless litestream_running?
 
-  def monitor_puma
-    monitor(:puma_dead?, "Detected Puma has gone away, stopping Litestream...")
+    log "Stopping Litestream..."
+    Process.kill(:INT, litestream_pid)
+    reap_litestream(0)
+  rescue Errno::ESRCH, Errno::ECHILD
+    # The process exited between the liveness check and the signal, or Puma's
+    # master reaped it first. Either way there is nothing left to stop.
   end
 
   def monitor_litestream
-    monitor(:litestream_dead?, "Detected Litestream has gone away, stopping Puma...")
-  end
-
-  def monitor(process_dead, message)
     loop do
-      if send(process_dead)
-        log message
-        Process.kill(:INT, $$)
-        break
-      end
       sleep 2
+      break if @stopping
+      next unless litestream_gone?
+
+      log "Detected Litestream has gone away, stopping Puma..."
+      Process.kill(:INT, $$)
+      break
     end
   end
 
-  def litestream_dead?
-    Process.waitpid(litestream_pid, Process::WNOHANG)
+  def litestream_gone?
+    # `on_booted` has not run yet, so there is no process to monitor.
+    return false if litestream_pid.nil?
+
+    # Reap first: an exited-but-unreaped child still answers `kill(0)`.
+    reap_litestream
+    !litestream_running?
+  end
+
+  # `Process.kill(0, pid)` rather than `waitpid`, because Puma's master reaps any
+  # child it finds (`Puma::Cluster#wait_workers`), not only its own workers, so
+  # `waitpid` can raise `Errno::ECHILD` for a process that is still running.
+  def litestream_running?
+    return false if litestream_pid.nil?
+
+    Process.kill(0, litestream_pid)
+    true
+  rescue Errno::ESRCH
     false
-  rescue Errno::ECHILD, Errno::ESRCH
+  rescue Errno::EPERM
     true
   end
 
-  def puma_dead?
-    Process.ppid != puma_pid
+  def reap_litestream(flags = Process::WNOHANG)
+    Process.waitpid(litestream_pid, flags)
+  rescue Errno::ECHILD, Errno::ESRCH
+    nil
   end
 
   def log(...)
