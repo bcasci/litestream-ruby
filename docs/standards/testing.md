@@ -11,3 +11,5 @@ Minitest, heavy stubbing, one dummy Rails host. No test touches a real binary, s
 7. Confine filesystem side effects to a `tmp` path you create and remove. Never write to or delete a shared/real dir like `Commands::DEFAULT_DIR`.
 8. `assert_equal expected, actual` — expected first, so failure diffs read correctly.
 9. One behavior per test.
+10. Prove a regression test fails against the unfixed code before you keep it. Revert the source, run the test, confirm it goes red, restore. A test that passes both before and after the fix covers nothing.
+11. Write a fixture that stands in for a third-party object against that library's current API, never a deprecated one. A deprecation warning in test output is a defect to fix or file, not noise.
